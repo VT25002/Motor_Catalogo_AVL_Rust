@@ -153,6 +153,81 @@ fn buscar(nodo: &Option<Box<Nodo>>, isbn: u32) -> Option<&Libro> {
     }
 }
 
+// Aplica las rotaciones necesarias según el factor de balance del nodo.
+// Se reutiliza tanto en insertar como en eliminar para mantener el árbol balanceado.
+fn balancear(mut nodo: Box<Nodo>) -> Box<Nodo> {
+    actualizar_altura(&mut nodo);
+    let balance = obtener_balance(&nodo);
+
+    // Caso LL: subárbol izquierdo-izquierdo
+    if balance > 1 && obtener_balance(nodo.izquierdo.as_ref().unwrap()) >= 0 {
+        return rotar_derecha(nodo);
+    }
+    // Caso LR: subárbol izquierdo-derecho
+    if balance > 1 && obtener_balance(nodo.izquierdo.as_ref().unwrap()) < 0 {
+        let hijo_izq = nodo.izquierdo.take().unwrap();
+        nodo.izquierdo = Some(rotar_izquierda(hijo_izq));
+        return rotar_derecha(nodo);
+    }
+    // Caso RR: subárbol derecho-derecho
+    if balance < -1 && obtener_balance(nodo.derecho.as_ref().unwrap()) <= 0 {
+        return rotar_izquierda(nodo);
+    }
+    // Caso RL: subárbol derecho-izquierdo
+    if balance < -1 && obtener_balance(nodo.derecho.as_ref().unwrap()) > 0 {
+        let hijo_der = nodo.derecho.take().unwrap();
+        nodo.derecho = Some(rotar_derecha(hijo_der));
+        return rotar_izquierda(nodo);
+    }
+
+    nodo
+}
+
+// Elimina el nodo con el ISBN dado y rebalancea el árbol según 3 casos:
+// Caso 1 - Nodo hoja (sin hijos): se elimina directamente retornando None.
+// Caso 2 - Nodo con un hijo: se reemplaza por su único hijo.
+// Caso 3 - Nodo con dos hijos: se reemplaza con el sucesor in-orden (mínimo del subárbol derecho) y se elimina ese sucesor.
+fn eliminar(nodo_opt: Option<Box<Nodo>>, isbn: u32) -> Option<Box<Nodo>> {
+    let mut nodo = match nodo_opt {
+        None => return None, // ISBN no existe en el árbol
+        Some(n) => n,
+    };
+
+    if isbn < nodo.libro.isbn {
+        nodo.izquierdo = eliminar(nodo.izquierdo.take(), isbn);
+    } else if isbn > nodo.libro.isbn {
+        nodo.derecho = eliminar(nodo.derecho.take(), isbn);
+    } else {
+        // Si el nodo se encuentra determinar que caso aplica:
+
+        // Caso 1 y 2: sin hijo izquierdo -> subir el derecho (puede ser None)
+        if nodo.izquierdo.is_none() {
+            return nodo.derecho;
+        }
+
+        // Caso 2: sin hijo derecho -> subir el izquierdo
+        if nodo.derecho.is_none() {
+            return nodo.izquierdo;
+        }
+
+        // Caso 3: dos hijos -> buscar sucesor in-orden (mínimo del subárbol derecho)
+        let sucesor_libro = {
+            let mut actual = nodo.derecho.as_ref().unwrap();
+            while let Some(ref izq) = actual.izquierdo {
+                actual = izq;
+            }
+            actual.libro.clone() // Se necesita el dato antes de eliminar el nodo
+        };
+
+        // Eliminar el sucesor del subárbol derecho y colocar su dato en el nodo actual
+        nodo.derecho = eliminar(nodo.derecho.take(), sucesor_libro.isbn);
+        nodo.libro = sucesor_libro;
+    }
+
+    // Rebalancear al subir en la recursión
+    Some(balancear(nodo))
+}
+
 fn main() {
     let mut raiz: Option<Box<Nodo>> = None;
     let datos = vec![
@@ -224,4 +299,27 @@ fn main() {
         ),
         None => println!("Libro no encontrado."),
     }
+
+    // FASE 3 - Eliminación
+    println!("\n--- Eliminación según diferentes casos ---");
+
+    // Caso 1: eliminar nodo hoja (ISBN 2, sin hijos)
+    println!("\nEliminación Caso 1: nodo hoja (ISBN 2)");
+    raiz = eliminar(raiz.take(), 2);
+    imprimir(&raiz, 0);
+
+    // Caso 2: eliminar nodo con un hijo (ISBN 30, solo tiene hijo izquierdo: 25)
+    println!("\nEliminación Caso 2: un hijo (ISBN 30)");
+    raiz = eliminar(raiz.take(), 30);
+    imprimir(&raiz, 0);
+
+    // Caso 3: eliminar nodo con dos hijos (ISBN 5, tiene izquierdo y derecho)
+    println!("\nEliminación Caso 3: dos hijos (ISBN 5)");
+    raiz = eliminar(raiz.take(), 5);
+    imprimir(&raiz, 0);
+
+    // Caso borde: eliminar ISBN inexistente
+    println!("\nEliminación de ISBN inexistente (ISBN 99)");
+    raiz = eliminar(raiz.take(), 99);
+    imprimir(&raiz, 0);
 }
