@@ -135,6 +135,24 @@ fn imprimir(nodo: &Option<Box<Nodo>>, nivel: usize) {
     }
 }
 
+// Busca un libro por ISBN recorriendo el árbol (sin copiar datos).
+// Retorna Some(&Libro) si lo encuentra, None si no existe.
+// Al usar &Libro evitamos clonar: solo prestamos una referencia al dato original.
+fn buscar(nodo: &Option<Box<Nodo>>, isbn: u32) -> Option<&Libro> {
+    match nodo {
+        None => None,
+        Some(n) => {
+            if isbn == n.libro.isbn {
+                Some(&n.libro)
+            } else if isbn < n.libro.isbn {
+                buscar(&n.izquierdo, isbn)
+            } else {
+                buscar(&n.derecho, isbn)
+            }
+        }
+    }
+}
+
 fn main() {
     let mut raiz: Option<Box<Nodo>> = None;
     let datos = vec![
@@ -158,7 +176,7 @@ fn main() {
     imprimir(&raiz, 0);
 
     // ============================================================
-    // FASE 1 — Prueba de Escritorio
+    // FASE 1 - Prueba de Escritorio
     // Inserción: [10, 20, 30, 5, 2, 25]
     //
     // Árbol final:
@@ -185,4 +203,25 @@ fn main() {
     // ============================================================
 
     // --- ESPACIO PARA TUS PRUEBAS ---
+
+    // FASE 2 - Búsqueda por ISBN
+    println!("\n--- Búsqueda en el inventario ---");
+
+    println!("\nPrueba con ISBN: 25");
+    match buscar(&raiz, 25) {
+        Some(libro) => println!(
+            "Libro encontrado con datos ISBN: {}, título: {}",
+            libro.isbn, libro.titulo
+        ),
+        None => println!("Libro no encontrado."),
+    }
+
+    println!("\nPrueba con ISBN: 99");
+    match buscar(&raiz, 99) {
+        Some(libro) => println!(
+            "Libro encontrado con datos ISBN: {}, título: {}",
+            libro.isbn, libro.titulo
+        ),
+        None => println!("Libro no encontrado."),
+    }
 }
