@@ -228,8 +228,43 @@ fn eliminar(nodo_opt: Option<Box<Nodo>>, isbn: u32) -> Option<Box<Nodo>> {
     Some(balancear(nodo))
 }
 
+// Retorna la altura del árbol, número de nodos, libro con isbn más alto
+// No copia libros: solo devuelve una referencia al libro máximo.
+// Las lifetimes garantizan que la referencia viva mientras exista el árbol.
+fn estadisticas_arbol<'a>(nodo: &'a Option<Box<Nodo>>) -> (i32, usize, Option<&'a Libro>) {
+    match nodo {
+        None => (0, 0, None),
+        Some(n) => {
+            let (altura_izq, nodos_izq, max_izq) = estadisticas_arbol(&n.izquierdo);
+            let (altura_der, nodos_der, max_der) = estadisticas_arbol(&n.derecho);
+
+            let altura_total = 1 + std::cmp::max(altura_izq, altura_der);
+            let total_nodos = 1 + nodos_izq + nodos_der;
+
+            // El libro actual se toma como candidato inicial al ISBN más alto.
+            let mut max_libro = &n.libro;
+
+            if let Some(libro) = max_izq {
+                if libro.isbn > max_libro.isbn {
+                    max_libro = libro;
+                }
+            }
+
+            if let Some(libro) = max_der {
+                if libro.isbn > max_libro.isbn {
+                    max_libro = libro;
+                }
+            }
+
+            (altura_total, total_nodos, Some(max_libro))
+        }
+    }
+}
+
 fn main() {
     let mut raiz: Option<Box<Nodo>> = None;
+    let mut raiz_stats: Option<Box<Nodo>> = None;
+
     let datos = vec![
         (10, "El Quijote"),
         (20, "1984"),
@@ -239,7 +274,20 @@ fn main() {
         (25, "El Principito"),
     ];
 
-    println!("--- Sistema de Inventario de Librería (AVL) ---");
+    let datos_stats = vec![
+        (5, "La Metamorfosis"),
+        (30, "Cien Años de Soledad"),
+        (70, "Crimen y Castigo"),
+        (20, "Cálculo Diferencial e Integral"),
+        (40, "El extraño caso del doctor Jekyll y el señor Hyde"),
+        (99, "El Corazón Delator"),
+        (60, "Lazarillo de Tormes"),
+    ];
+
+    println!("\n=================================================");
+    println!("FASE 1 - Sistema de Inventario de Librería (AVL)");
+    println!("=================================================");
+
     for (isbn, titulo) in datos {
         let libro = Libro {
             isbn,
@@ -279,8 +327,9 @@ fn main() {
 
     // --- ESPACIO PARA TUS PRUEBAS ---
 
-    // FASE 2 - Búsqueda por ISBN
-    println!("\n--- Búsqueda en el inventario ---");
+    println!("\n=================================================");
+    println!("FASE 2 - Búsqueda por ISBN");
+    println!("=================================================");
 
     println!("\nPrueba con ISBN: 25");
     match buscar(&raiz, 25) {
@@ -300,8 +349,9 @@ fn main() {
         None => println!("Libro no encontrado."),
     }
 
-    // FASE 3 - Eliminación
-    println!("\n--- Eliminación según diferentes casos ---");
+    println!("\n=================================================");
+    println!("FASE 3 - Eliminación según diferentes casos");
+    println!("=================================================");
 
     // Caso 1: eliminar nodo hoja (ISBN 2, sin hijos)
     println!("\nEliminación Caso 1: nodo hoja (ISBN 2)");
@@ -322,4 +372,33 @@ fn main() {
     println!("\nEliminación de ISBN inexistente (ISBN 99)");
     raiz = eliminar(raiz.take(), 99);
     imprimir(&raiz, 0);
+
+    println!("\n=================================================");
+    println!("FASE 4 - Implementación de Estadísticas de Árbol");
+    println!("=================================================");
+
+    for (isbn, titulo) in datos_stats {
+        let libro = Libro {
+            isbn,
+            titulo: titulo.to_string(),
+        };
+        raiz_stats = Some(insertar(raiz_stats.take(), libro));
+    }
+
+    println!("\n Árbol de referencia:");
+    imprimir(&raiz_stats, 0);
+
+    // Uso de la función de estadísticas y estadísticas:
+    let (altura, total_nodos, libro_max) = estadisticas_arbol(&raiz_stats);
+    println!("\nEstadísticas del nuevo árbol:");
+    println!("Altura total: {}", altura);
+    println!("Número total de nodos: {}", total_nodos);
+
+    match libro_max {
+        Some(libro) => println!(
+            "Libro con ISBN más alto: {}, título: {}",
+            libro.isbn, libro.titulo
+        ),
+        None => println!("El árbol está vacío."),
+    }
 }
